@@ -23,7 +23,7 @@ def normalize(value: str) -> str:
 
 
 def _digit(chars: str, weights: tuple[int, ...]) -> int:
-    total = sum((ord(c) - 48) * w for c, w in zip(chars, weights))
+    total = sum((ord(c) - 48) * w for c, w in zip(chars, weights, strict=True))
     remainder = total % 11
     return 0 if remainder < 2 else 11 - remainder
 

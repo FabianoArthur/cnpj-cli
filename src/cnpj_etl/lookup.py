@@ -10,8 +10,12 @@ from cnpj_etl import cnpj
 
 SITUACAO = {"01": "nula", "02": "ativa", "03": "suspensa", "04": "inapta", "08": "baixada"}
 MATRIZ_FILIAL = {"1": "matriz", "2": "filial"}
-PORTE = {"00": "não informado", "01": "micro empresa", "03": "empresa de pequeno porte",
-         "05": "demais"}
+PORTE = {
+    "00": "não informado",
+    "01": "micro empresa",
+    "03": "empresa de pequeno porte",
+    "05": "demais",
+}
 TIPO_SOCIO = {"1": "pessoa jurídica", "2": "pessoa física", "3": "estrangeiro"}
 
 
@@ -31,9 +35,12 @@ def _money(value: str | None) -> float | None:
 
 
 def _has_table(conn: sqlite3.Connection, name: str) -> bool:
-    return conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (name,)
-    ).fetchone() is not None
+    return (
+        conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (name,)
+        ).fetchone()
+        is not None
+    )
 
 
 class _Describer:
@@ -78,21 +85,30 @@ def lookup(db_path: Path, value: str) -> dict[str, Any] | None:
         ).fetchone()
         if est is None:
             return None
-        emp = conn.execute(
-            "SELECT * FROM empresas WHERE cnpj_basico = ?", (basico,)
-        ).fetchone() if _has_table(conn, "empresas") else None
-        simples = conn.execute(
-            "SELECT * FROM simples WHERE cnpj_basico = ?", (basico,)
-        ).fetchone() if _has_table(conn, "simples") else None
-        socios = conn.execute(
-            "SELECT * FROM socios WHERE cnpj_basico = ? ORDER BY rowid", (basico,)
-        ).fetchall() if _has_table(conn, "socios") else []
+        emp = (
+            conn.execute("SELECT * FROM empresas WHERE cnpj_basico = ?", (basico,)).fetchone()
+            if _has_table(conn, "empresas")
+            else None
+        )
+        simples = (
+            conn.execute("SELECT * FROM simples WHERE cnpj_basico = ?", (basico,)).fetchone()
+            if _has_table(conn, "simples")
+            else None
+        )
+        socios = (
+            conn.execute(
+                "SELECT * FROM socios WHERE cnpj_basico = ? ORDER BY rowid", (basico,)
+            ).fetchall()
+            if _has_table(conn, "socios")
+            else []
+        )
         describe = _Describer(conn)
 
         secundarios = [c for c in (est["cnae_secundario"] or "").split(",") if c]
         address = " ".join(
-            p for p in (est["tipo_logradouro"], est["logradouro"], est["numero"],
-                        est["complemento"]) if p
+            p
+            for p in (est["tipo_logradouro"], est["logradouro"], est["numero"], est["complemento"])
+            if p
         )
         phone = f"({est['ddd1']}) {est['telefone1']}" if est["telefone1"] else None
         return {
@@ -100,8 +116,9 @@ def lookup(db_path: Path, value: str) -> dict[str, Any] | None:
             "razao_social": emp["razao_social"] if emp else None,
             "nome_fantasia": est["nome_fantasia"] or None,
             "matriz_filial": MATRIZ_FILIAL.get(est["matriz_filial"], est["matriz_filial"]),
-            "situacao_cadastral": SITUACAO.get(est["situacao_cadastral"],
-                                               est["situacao_cadastral"]),
+            "situacao_cadastral": SITUACAO.get(
+                est["situacao_cadastral"], est["situacao_cadastral"]
+            ),
             "data_situacao_cadastral": _date(est["data_situacao_cadastral"]),
             "motivo_situacao": describe("motivos", est["motivo_situacao_cadastral"]),
             "data_inicio_atividade": _date(est["data_inicio_atividade"]),
@@ -120,7 +137,9 @@ def lookup(db_path: Path, value: str) -> dict[str, Any] | None:
             "simples": {
                 "opcao_simples": simples["opcao_simples"] == "S",
                 "opcao_mei": simples["opcao_mei"] == "S",
-            } if simples else None,
+            }
+            if simples
+            else None,
             "socios": [
                 {
                     "nome": s["nome_socio"],

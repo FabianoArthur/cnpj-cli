@@ -94,15 +94,27 @@ def cmd_download(args: argparse.Namespace) -> int:
             print(month)
         log.info("%d of %d month(s) missing in %s", len(missing), len(wanted), base)
         return EXIT_OK
-    log.info("%d month(s) to download into %s with %d worker(s)", len(missing), base,
-             download.clamp_workers(args.workers))
+    log.info(
+        "%d month(s) to download into %s with %d worker(s)",
+        len(missing),
+        base,
+        download.clamp_workers(args.workers),
+    )
     report = download.sync(
-        wanted, base, base_url=args.base_url, workers=args.workers, policy=_policy(),
+        wanted,
+        base,
+        base_url=args.base_url,
+        workers=args.workers,
+        policy=_policy(),
         show_progress=not args.quiet,
     )
-    log.info("downloaded: %d, already there: %d, not published: %d, failed: %d",
-             len(report.done), len(report.skipped), len(report.not_published),
-             len(report.failed))
+    log.info(
+        "downloaded: %d, already there: %d, not published: %d, failed: %d",
+        len(report.done),
+        len(report.skipped),
+        len(report.not_published),
+        len(report.failed),
+    )
     if report.not_published:
         log.info("not published yet: %s", ", ".join(report.not_published))
     if report.failed:
@@ -123,7 +135,7 @@ def cmd_sqlite(args: argparse.Namespace) -> int:
     finally:
         if not args.keep_extracted:
             shutil.rmtree(work, ignore_errors=True)
-    log.info("%s: %d rows in %s", month, sum(counts.values()), db)
+    log.info("%s: %d rows in %d tables -> %s", month, sum(counts.values()), len(counts), db)
     return EXIT_OK
 
 
@@ -142,8 +154,9 @@ def cmd_postgres(args: argparse.Namespace) -> int:
         work = csv_dir = _extracted(args, base, month)
     try:
         with postgres_load.connect(args.dsn) as conn:
-            counts = postgres_load.load_snapshot(conn, csv_dir, args.schema, only=args.only,
-                                                 logged=args.logged)
+            counts = postgres_load.load_snapshot(
+                conn, csv_dir, args.schema, only=args.only, logged=args.logged
+            )
     finally:
         if work and not args.keep_extracted:
             shutil.rmtree(work, ignore_errors=True)
@@ -162,8 +175,9 @@ def cmd_bulk_load(args: argparse.Namespace) -> int:
         return EXIT_FAIL
     log.info("%d month(s) found: %s", len(found), ", ".join(m for m, _ in found))
     with postgres_load.connect(args.dsn) as conn:
-        report = postgres_load.bulk_load(conn, base, found, args.schema, reload=args.reload,
-                                         skip_indexes=args.skip_indexes)
+        report = postgres_load.bulk_load(
+            conn, base, found, args.schema, reload=args.reload, skip_indexes=args.skip_indexes
+        )
     log.info("loaded: %d, already loaded: %d", len(report["processed"]), len(report["skipped"]))
     return EXIT_OK
 
@@ -180,12 +194,14 @@ def cmd_validate(args: argparse.Namespace) -> int:
         normalized = cnpj.normalize(value)
         well_formed = len(normalized) == cnpj.LENGTH
         valid = cnpj.is_valid(value)
-        records.append({
-            "input": value,
-            "cnpj": cnpj.format_cnpj(normalized) if well_formed else None,
-            "valid": valid,
-            "kind": cnpj.kind(normalized) if well_formed else None,
-        })
+        records.append(
+            {
+                "input": value,
+                "cnpj": cnpj.format_cnpj(normalized) if well_formed else None,
+                "valid": valid,
+                "kind": cnpj.kind(normalized) if well_formed else None,
+            }
+        )
     output.write(records, args.format, sys.stdout)
     return EXIT_OK if all(r["valid"] for r in records) else EXIT_FAIL
 
@@ -215,20 +231,34 @@ def build_parser() -> argparse.ArgumentParser:
     default_url = os.environ.get("CNPJ_BASE_URL", download.DEFAULT_BASE_URL)
 
     common = argparse.ArgumentParser(add_help=False)
-    common.add_argument("-v", "--verbose", action="store_true", default=argparse.SUPPRESS,
-                        help="debug logging")
-    common.add_argument("-q", "--quiet", action="store_true", default=argparse.SUPPRESS,
-                        help="warnings and errors only, no progress bars")
+    common.add_argument(
+        "-v", "--verbose", action="store_true", default=argparse.SUPPRESS, help="debug logging"
+    )
+    common.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        default=argparse.SUPPRESS,
+        help="warnings and errors only, no progress bars",
+    )
 
     data = argparse.ArgumentParser(add_help=False)
-    data.add_argument("--dir", "--output-dir", default=default_dir, metavar="DIR",
-                      help=f"data folder, one YYYY-MM/ per month (default: $CNPJ_DATA_DIR or "
-                           f"{default_dir!r})")
+    data.add_argument(
+        "--dir",
+        "--output-dir",
+        default=default_dir,
+        metavar="DIR",
+        help=f"data folder, one YYYY-MM/ per month (default: $CNPJ_DATA_DIR or {default_dir!r})",
+    )
 
     remote = argparse.ArgumentParser(add_help=False)
-    remote.add_argument("--base-url", default=default_url, metavar="URL",
-                        help="download URL with {} for the month (default: Receita Federal "
-                             "share, or $CNPJ_BASE_URL)")
+    remote.add_argument(
+        "--base-url",
+        default=default_url,
+        metavar="URL",
+        help="download URL with {} for the month (default: Receita Federal "
+        "share, or $CNPJ_BASE_URL)",
+    )
 
     pg = argparse.ArgumentParser(add_help=False)
     pg.add_argument("--dsn", help="postgresql://... (default: $DATABASE_URL, then PG* variables)")
@@ -240,60 +270,88 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="cnpj",
         description="Download Brazil's open CNPJ registry (Receita Federal) and load it into "
-                    "SQLite or PostgreSQL.",
+        "SQLite or PostgreSQL.",
         parents=[common],
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="command", required=True, metavar="COMMAND")
 
-    p = sub.add_parser("download", parents=[common, data, remote],
-                       help="download every monthly snapshot missing on disk")
-    p.add_argument("--start", type=_month, default=months.EARLIEST,
-                   help=f"first month, YYYY-MM (default: {months.EARLIEST})")
+    p = sub.add_parser(
+        "download",
+        parents=[common, data, remote],
+        help="download every monthly snapshot missing on disk",
+    )
+    p.add_argument(
+        "--start",
+        type=_month,
+        default=months.EARLIEST,
+        help=f"first month, YYYY-MM (default: {months.EARLIEST})",
+    )
     p.add_argument("--end", type=_month, help="last month (default: current month)")
-    p.add_argument("--workers", type=int, default=download.DEFAULT_WORKERS,
-                   help=f"parallel downloads, 1-{download.MAX_WORKERS} "
-                        f"(default: {download.DEFAULT_WORKERS})")
+    p.add_argument(
+        "--workers",
+        type=int,
+        default=download.DEFAULT_WORKERS,
+        help=f"parallel downloads, 1-{download.MAX_WORKERS} (default: {download.DEFAULT_WORKERS})",
+    )
     p.add_argument("--dry-run", action="store_true", help="print the missing months and exit")
     p.set_defaults(func=cmd_download)
 
-    p = sub.add_parser("sqlite", parents=[common, data, remote],
-                       help="one month into a SQLite file")
+    p = sub.add_parser(
+        "sqlite", parents=[common, data, remote], help="one month into a SQLite file"
+    )
     p.add_argument("month", nargs="?", type=_month, help="YYYY-MM (default: last closed month)")
     p.add_argument("--db", help="database path (default: DIR/cnpj_YYYY_MM.db)")
-    p.add_argument("--only", nargs="+", choices=tables, metavar="TABLE",
-                   help=f"load only these tables: {', '.join(tables)}")
+    p.add_argument(
+        "--only",
+        nargs="+",
+        choices=tables,
+        metavar="TABLE",
+        help=f"load only these tables: {', '.join(tables)}",
+    )
     p.add_argument("--keep-extracted", action="store_true", help="keep the extracted CSVs")
     p.set_defaults(func=cmd_sqlite)
 
-    p = sub.add_parser("postgres", parents=[common, data, remote, pg],
-                       help="one month into PostgreSQL, replacing the previous snapshot")
+    p = sub.add_parser(
+        "postgres",
+        parents=[common, data, remote, pg],
+        help="one month into PostgreSQL, replacing the previous snapshot",
+    )
     p.add_argument("month", nargs="?", type=_month, help="YYYY-MM (default: last closed month)")
-    p.add_argument("--only", nargs="+", choices=tables, metavar="TABLE",
-                   help="load only these tables")
+    p.add_argument(
+        "--only", nargs="+", choices=tables, metavar="TABLE", help="load only these tables"
+    )
     p.add_argument("--csv-dir", help="skip download and extraction, load CSVs from here")
-    p.add_argument("--logged", action="store_true",
-                   help="create LOGGED tables up front (default: UNLOGGED while loading, then "
-                        "SET LOGGED)")
+    p.add_argument(
+        "--logged",
+        action="store_true",
+        help="create LOGGED tables up front (default: UNLOGGED while loading, then SET LOGGED)",
+    )
     p.add_argument("--keep-extracted", action="store_true", help="keep the extracted CSVs")
     p.set_defaults(func=cmd_postgres)
 
-    p = sub.add_parser("bulk-load", parents=[common, data, pg],
-                       help="every downloaded month into PostgreSQL, keeping history")
-    p.add_argument("--only", nargs="+", type=_month, metavar="YYYY-MM",
-                   help="load only these months")
+    p = sub.add_parser(
+        "bulk-load",
+        parents=[common, data, pg],
+        help="every downloaded month into PostgreSQL, keeping history",
+    )
+    p.add_argument(
+        "--only", nargs="+", type=_month, metavar="YYYY-MM", help="load only these months"
+    )
     p.add_argument("--reload", action="store_true", help="replace months already loaded")
     p.add_argument("--skip-indexes", action="store_true", help="do not create indexes at the end")
     p.set_defaults(func=cmd_bulk_load)
 
-    p = sub.add_parser("validate", parents=[common],
-                       help="check CNPJ check digits (numeric and alphanumeric)")
+    p = sub.add_parser(
+        "validate", parents=[common], help="check CNPJ check digits (numeric and alphanumeric)"
+    )
     p.add_argument("cnpj", nargs="*", help="CNPJs to check; '-' or nothing reads stdin")
     p.add_argument("--format", choices=output.FORMATS, default="table")
     p.set_defaults(func=cmd_validate)
 
-    p = sub.add_parser("lookup", parents=[common],
-                       help="show one CNPJ from a database built by `cnpj sqlite`")
+    p = sub.add_parser(
+        "lookup", parents=[common], help="show one CNPJ from a database built by `cnpj sqlite`"
+    )
     p.add_argument("cnpj")
     p.add_argument("--db", required=True, help="SQLite file built by `cnpj sqlite`")
     p.add_argument("--format", choices=output.FORMATS, default="table")

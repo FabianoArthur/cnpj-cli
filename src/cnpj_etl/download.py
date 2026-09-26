@@ -250,16 +250,19 @@ def download_month(
 
     url = base_url.format(month)
     log.debug("%s: GET %s", month, url)
-    with make_session() as session, tqdm(
-        desc=month,
-        unit="B",
-        unit_scale=True,
-        unit_divisor=1024,
-        disable=not show_progress or None,
-        position=position,
-        leave=True,
-        dynamic_ncols=True,
-    ) as progress:
+    with (
+        make_session() as session,
+        tqdm(
+            desc=month,
+            unit="B",
+            unit_scale=True,
+            unit_divisor=1024,
+            disable=not show_progress or None,
+            position=position,
+            leave=True,
+            dynamic_ncols=True,
+        ) as progress,
+    ):
         attempt = 0
         while True:
             attempt += 1
@@ -270,8 +273,9 @@ def download_month(
                 if attempt >= policy.attempts:
                     raise DownloadError(f"{month}: {exc} (gave up after {attempt} tries)") from exc
                 wait = policy.delay(attempt, exc.retry_after)
-                log.warning("%s: %s, retrying in %.1fs (%d/%d)", month, exc, wait, attempt,
-                            policy.attempts)
+                log.warning(
+                    "%s: %s, retrying in %.1fs (%d/%d)", month, exc, wait, attempt, policy.attempts
+                )
                 policy.sleep(wait)
 
     if outcome == "not_published":
@@ -342,8 +346,12 @@ def sync(
         raise
     pool.shutdown()
 
-    buckets = {"done": report.done, "not_published": report.not_published,
-               "failed": report.failed, "skipped": report.skipped}
+    buckets = {
+        "done": report.done,
+        "not_published": report.not_published,
+        "failed": report.failed,
+        "skipped": report.skipped,
+    }
     for month in todo:
         buckets[results[month]].append(month)
     return report

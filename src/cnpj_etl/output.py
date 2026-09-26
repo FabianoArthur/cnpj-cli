@@ -27,8 +27,8 @@ def _cell(value: Any) -> str:
 def _human(value: Any) -> str:
     if isinstance(value, bool):
         return "yes" if value else "no"
-    if isinstance(value, (list, tuple)) and not value:
-        return "-"
+    if isinstance(value, (list, tuple)):
+        return ", ".join(_human(v) for v in value) if value else "-"
     return _cell(value) or "-"
 
 
@@ -53,9 +53,13 @@ def write(records: Sequence[Mapping[str, Any]], fmt: str, stream: TextIO) -> Non
         keys = list(records[0])
         rows = [[_human(r.get(k)) for k in keys] for r in records]
         widths = [max(len(k), *(len(row[i]) for row in rows)) for i, k in enumerate(keys)]
-        stream.write("  ".join(k.upper().ljust(w) for k, w in zip(keys, widths)).rstrip() + "\n")
+        stream.write(
+            "  ".join(k.upper().ljust(w) for k, w in zip(keys, widths, strict=True)).rstrip() + "\n"
+        )
         for row in rows:
-            stream.write("  ".join(v.ljust(w) for v, w in zip(row, widths)).rstrip() + "\n")
+            stream.write(
+                "  ".join(v.ljust(w) for v, w in zip(row, widths, strict=True)).rstrip() + "\n"
+            )
     else:
         raise ValueError(f"unknown format {fmt!r}; choose from {', '.join(FORMATS)}")
 
@@ -71,11 +75,18 @@ def write_record(record: Mapping[str, Any], fmt: str, stream: TextIO) -> None:
             if isinstance(value, list) and value and isinstance(value[0], dict):
                 stream.write(f"{key.ljust(width)}  {len(value)}\n")
                 for item in value:
-                    stream.write(" " * (width + 2) + "- " + ", ".join(
-                        f"{k}: {_human(v)}" for k, v in item.items()) + "\n")
+                    stream.write(
+                        " " * (width + 2)
+                        + "- "
+                        + ", ".join(f"{k}: {_human(v)}" for k, v in item.items())
+                        + "\n"
+                    )
             elif isinstance(value, dict):
-                stream.write(f"{key.ljust(width)}  " + ", ".join(
-                    f"{k}: {_human(v)}" for k, v in value.items()) + "\n")
+                stream.write(
+                    f"{key.ljust(width)}  "
+                    + ", ".join(f"{k}: {_human(v)}" for k, v in value.items())
+                    + "\n"
+                )
             else:
                 stream.write(f"{key.ljust(width)}  {_human(value)}\n")
     else:

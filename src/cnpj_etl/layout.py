@@ -124,9 +124,7 @@ def find_csvs(base_dir: Path, prefix: str) -> list[Path]:
     substring test.
     """
     prefix = prefix.upper()
-    return sorted(
-        p for p in base_dir.rglob("*") if p.is_file() and prefix in p.name.upper()
-    )
+    return sorted(p for p in base_dir.rglob("*") if p.is_file() and prefix in p.name.upper())
 
 
 def iter_rows(path: Path, width: int) -> Iterator[list[str]]:

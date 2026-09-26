@@ -62,7 +62,8 @@ def extract(path: Path, dest: Path) -> None:
             _extract_tar(path, dest)
         elif fmt == "zip":
             with zipfile.ZipFile(path) as z:
-                z.extractall(dest)  # zipfile strips absolute paths and ".." itself
+                # zipfile strips absolute paths and ".." from member names itself.
+                z.extractall(dest)  # noqa: S202
         else:
             with open(path, "rb") as fh:
                 preview = fh.read(80)
@@ -79,7 +80,7 @@ def extract(path: Path, dest: Path) -> None:
     for zip_path in inner:
         log.debug("unpacking %s", zip_path.name)
         with zipfile.ZipFile(zip_path) as z:
-            z.extractall(zip_path.parent)
+            z.extractall(zip_path.parent)  # noqa: S202 - same sanitising as above
         zip_path.unlink()
 
 

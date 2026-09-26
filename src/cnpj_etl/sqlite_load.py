@@ -36,7 +36,9 @@ def _quote(name: str) -> str:
 
 def _load_table(conn: sqlite3.Connection, csv_dir: Path, table: str) -> int:
     columns = layout.column_names(table)
-    conn.execute(f"CREATE TABLE {_quote(table)} ({', '.join(_quote(c) + ' TEXT' for c in columns)})")
+    conn.execute(
+        f"CREATE TABLE {_quote(table)} ({', '.join(_quote(c) + ' TEXT' for c in columns)})"
+    )
     files = layout.find_csvs(csv_dir, layout.ALL_TABLES[table]["prefix"])
     if not files:
         log.warning("no files for %s (prefix %s)", table, layout.ALL_TABLES[table]["prefix"])
@@ -47,7 +49,7 @@ def _load_table(conn: sqlite3.Connection, csv_dir: Path, table: str) -> int:
     )
     total = 0
     for path in files:
-        log.info("%s <- %s", table, path.name)
+        log.debug("%s <- %s", table, path.name)
         batch: list[list[str]] = []
         for row in layout.iter_rows(path, len(columns)):
             batch.append(row)
@@ -95,5 +97,4 @@ def load(csv_dir: Path, db_path: Path, only: Iterable[str] | None = None) -> dic
     finally:
         with contextlib.suppress(FileNotFoundError):
             tmp.unlink()
-    log.info("database ready: %s", db_path)
     return counts

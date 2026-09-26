@@ -117,7 +117,7 @@ def _copy_table(cur, csv_dir: Path, schema: str, table: str, competencia: str | 
         log.warning("no files for %s (prefix %s)", table, layout.ALL_TABLES[table]["prefix"])
     total = 0
     for path in files:
-        log.info("%s.%s <- %s", schema, table, path.name)
+        log.debug("%s.%s <- %s", schema, table, path.name)
         total += _copy_file(cur, path, schema, table, competencia)
     log.info("%s.%s: %d rows", schema, table, total)
     return total
@@ -129,9 +129,11 @@ def _create_indexes(cur, schema: str, indexes, tables: Iterable[str]) -> None:
     tables = set(tables)
     for table, name, cols in indexes:
         if table in tables:
-            cur.execute(sql.SQL("CREATE INDEX IF NOT EXISTS {} ON {} ({})").format(
-                _ident(name), _ident(schema, table), sql.SQL(", ").join(_ident(c) for c in cols)
-            ))
+            cur.execute(
+                sql.SQL("CREATE INDEX IF NOT EXISTS {} ON {} ({})").format(
+                    _ident(name), _ident(schema, table), sql.SQL(", ").join(_ident(c) for c in cols)
+                )
+            )
 
 
 def _analyze(conn, schema: str, tables: Iterable[str]) -> None:
@@ -200,26 +202,35 @@ def _ensure_bulk_schema(conn, schema: str) -> None:
 
     with conn.transaction(), conn.cursor() as cur:
         cur.execute(sql.SQL("CREATE SCHEMA IF NOT EXISTS {}").format(_ident(schema)))
-        cur.execute(sql.SQL(
-            "CREATE TABLE IF NOT EXISTS {} (competencia TEXT PRIMARY KEY, "
-            "carregada_em TIMESTAMPTZ NOT NULL DEFAULT NOW())"
-        ).format(_ident(schema, TRACKING_TABLE)))
+        cur.execute(
+            sql.SQL(
+                "CREATE TABLE IF NOT EXISTS {} (competencia TEXT PRIMARY KEY, "
+                "carregada_em TIMESTAMPTZ NOT NULL DEFAULT NOW())"
+            ).format(_ident(schema, TRACKING_TABLE))
+        )
         for table in layout.ALL_TABLES:
             cols = [sql.SQL("{} TEXT").format(_ident(c)) for c in layout.column_names(table)]
             if table in layout.MAIN_TABLES:
                 cols.insert(0, sql.SQL("competencia TEXT NOT NULL"))
-            cur.execute(sql.SQL("CREATE TABLE IF NOT EXISTS {} ({})").format(
-                _ident(schema, table), sql.SQL(", ").join(cols)
-            ))
+            cur.execute(
+                sql.SQL("CREATE TABLE IF NOT EXISTS {} ({})").format(
+                    _ident(schema, table), sql.SQL(", ").join(cols)
+                )
+            )
 
 
 def _is_loaded(conn, schema: str, month: str) -> bool:
     from psycopg import sql
 
-    return conn.execute(
-        sql.SQL("SELECT 1 FROM {} WHERE competencia = %s").format(_ident(schema, TRACKING_TABLE)),
-        (month,),
-    ).fetchone() is not None
+    return (
+        conn.execute(
+            sql.SQL("SELECT 1 FROM {} WHERE competencia = %s").format(
+                _ident(schema, TRACKING_TABLE)
+            ),
+            (month,),
+        ).fetchone()
+        is not None
+    )
 
 
 def _is_empty(cur, schema: str, table: str) -> bool:
@@ -259,12 +270,14 @@ def bulk_load(
                     for table in layout.MAIN_TABLES:
                         cur.execute(
                             sql.SQL("DELETE FROM {} WHERE competencia = %s").format(
-                                _ident(schema, table)),
+                                _ident(schema, table)
+                            ),
                             (month,),
                         )
                     cur.execute(
                         sql.SQL("DELETE FROM {} WHERE competencia = %s").format(
-                            _ident(schema, TRACKING_TABLE)),
+                            _ident(schema, TRACKING_TABLE)
+                        ),
                         (month,),
                     )
                 for table in layout.LOOKUP_TABLES:
@@ -274,7 +287,8 @@ def bulk_load(
                     _copy_table(cur, work, schema, table, month)
                 cur.execute(
                     sql.SQL("INSERT INTO {} (competencia) VALUES (%s)").format(
-                        _ident(schema, TRACKING_TABLE)),
+                        _ident(schema, TRACKING_TABLE)
+                    ),
                     (month,),
                 )
         finally:
