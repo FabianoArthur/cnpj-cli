@@ -1,309 +1,191 @@
-# script-cnpj
+# cnpj-etl
 
-Baixa os **dados públicos de CNPJ da Receita Federal** e carrega num banco
-local (SQLite) ou remoto (PostgreSQL). Cobre desde o dump mais antigo
-(maio/2023) até o mês atual, com histórico mês a mês.
+**Brazil's whole company registry on your machine, in one command.** `cnpj` downloads the
+monthly open-data snapshots of every CNPJ published by Receita Federal and loads them into
+SQLite or PostgreSQL. It retries, resumes and keeps month-by-month history.
 
-Fonte oficial: [arquivos.receitafederal.gov.br](https://arquivos.receitafederal.gov.br/dados/cnpj/dados_abertos_cnpj/).
+[Português (Brasil)](README.pt-BR.md)
 
----
+[![CI](https://github.com/FabianoArthur/script-cnpj/actions/workflows/ci.yml/badge.svg)](https://github.com/FabianoArthur/script-cnpj/actions/workflows/ci.yml)
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
+![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
-## Qual script eu uso?
+![A terminal session: cnpj download retries after an HTTP 503, cnpj sqlite loads ten tables, cnpj lookup prints a company and cnpj validate checks three CNPJs](docs/assets/demo.png)
 
-Depende do que você quer fazer:
+<sub>Real output of `python scripts/demo.py`: the CLI runs against a local server with
+synthetic data, so every company shown is fictional.</sub>
 
-| Eu quero... | Use |
-|---|---|
-| Só o **último mês** num SQLite local pra explorar | `cnpj_pipeline.py` |
-| Só o **último mês** direto num Postgres | `cnpj_to_postgres.py` |
-| **Baixar todos os meses** (sem carregar em banco) | `sync_months.py` |
-| **Carregar todos os meses já baixados** num Postgres, com histórico | `bulk_load_postgres.py` |
+## Why it is interesting
 
-O fluxo recomendado para **histórico completo** é:
-**1)** `sync_months.py` baixa tudo →
-**2)** `bulk_load_postgres.py` carrega tudo no Postgres.
+The data is public but awkward. Each month is a ~6 GB archive on a government file share
+that is slow and sometimes down. Inside are dozens of zipped latin-1 CSV files without
+headers. The format of the archive itself changes between months: sometimes a tar.gz,
+sometimes a zip under the same name. `cnpj` deals with all of that:
 
----
+- **Downloads that survive a bad network.** Exponential backoff with jitter, `Retry-After`
+  honoured, resume from the last byte with `Range` + `If-Range`, so a republished file is
+  never stitched onto stale bytes. Files appear only through an atomic rename.
+- **Polite by default.** Two months at a time (at most four), a descriptive `User-Agent`,
+  and months already on disk are never fetched again.
+- **Safe extraction.** It detects the real format from magic bytes, refuses path traversal
+  and links, and recognises an HTML error page saved as `.tar.gz`.
+- **All-or-nothing loads.** SQLite builds into a temporary file and swaps it in. A
+  PostgreSQL snapshot loads in one transaction. The history load runs one transaction per
+  month, so an interrupted run never leaves half a month behind.
+- **Ready for the alphanumeric CNPJ** (IN RFB 2.229/2024). `cnpj validate` checks both
+  formats.
 
-## Instalação
+## How it works
 
-Python 3.10 ou mais novo.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/how-it-works-dark.svg">
+  <img alt="Flow: Receita Federal share over HTTPS to cnpj download (retry, backoff, resume, up to 4 in parallel), into data/YYYY-MM/dados.tar.gz, then safe extraction to latin-1 CSV, then three loaders: cnpj sqlite (one month, then cnpj lookup prints JSON, CSV or a table), cnpj postgres (one month, replaces the snapshot atomically) and cnpj bulk-load (every month with history, one transaction per month) into PostgreSQL" src="docs/assets/how-it-works-light.svg">
+</picture>
+
+## Install
+
+Python 3.10 or newer.
 
 ```bash
-git clone git@github.com:Fabiano-Arthur/script-cnpj.git
+git clone https://github.com/FabianoArthur/script-cnpj.git
 cd script-cnpj
-
-python -m venv .venv
-source .venv/bin/activate
-
-pip install -r requirements.txt
+python -m venv .venv && source .venv/bin/activate
+pip install ".[postgres]"      # drop [postgres] if you only need SQLite
+cnpj --help
 ```
 
-Dependências: `requests`, `tqdm`, `psycopg`.
-
----
-
-## Quick start — histórico completo no Postgres
+## Quick start
 
 ```bash
-# 1. Configure conexão com o Postgres (uma vez)
-export PGHOST=localhost
-export PGPORT=5432
-export PGUSER=meuusuario
-export PGPASSWORD=minhasenha
-export PGDATABASE=meubanco
+# Last closed month into SQLite (~6 GB download, one .db file)
+cnpj sqlite
+cnpj lookup 00.000.000/0001-91 --db data/cnpj_2026_08.db --format json
 
-# 2. Baixa todos os meses (2023-05 até hoje) — leva horas
-python sync_months.py --output-dir /dados/cnpj
-
-# 3. Carrega tudo no Postgres — também leva horas
-python bulk_load_postgres.py --output-dir /dados/cnpj
+# Full history into PostgreSQL
+export DATABASE_URL=postgresql://user:password@localhost:5432/cnpj
+cnpj download                  # every month since 2023-05 that is not on disk yet
+cnpj bulk-load                 # every downloaded month, with a competencia column
 ```
 
-Pronto. Os dados ficam no schema `cnpj` com uma coluna `competencia`
-identificando a qual mês cada linha pertence.
-
-> **Importante:** isso vai gerar **centenas de GB** baixados e potencialmente
-> **terabytes** no Postgres. Para experimentar antes, restrinja a poucos meses:
-> ```bash
-> python sync_months.py --start 2026-04 --end 2026-05 --output-dir /dados/cnpj
-> python bulk_load_postgres.py --output-dir /dados/cnpj --only 2026-04 2026-05
-> ```
-
----
-
-## Scripts em detalhe
-
-### `sync_months.py` — baixar os meses
-
-Varre o servidor da Receita e baixa cada competência **que ainda não está**
-na sua pasta. Idempotente — pode rodar quantas vezes quiser, ele só baixa
-o que falta.
+Try a couple of months before committing to the full history (hundreds of GB):
 
 ```bash
-# Baixa tudo, perguntando onde salvar
-python sync_months.py
-
-# Especificando a pasta direto
-python sync_months.py --output-dir /dados/cnpj
-
-# Apenas um intervalo
-python sync_months.py --start 2024-01 --end 2024-12 --output-dir /dados/cnpj
-
-# Ver o que faria, sem baixar
-python sync_months.py --dry-run --output-dir /dados/cnpj
+cnpj download --start 2026-07 --end 2026-08
+cnpj bulk-load --only 2026-07 2026-08
 ```
 
-**Estrutura criada:**
+## Commands
 
-```
-/dados/cnpj/
-├── 2023-05/
-│   └── dados.tar.gz
-├── 2023-06/
-│   └── dados.tar.gz
-├── ...
-└── 2026-05/
-    └── dados.tar.gz
-```
-
-**Regras de idempotência:**
-
-| Estado da pasta `YYYY-MM/` | O que o script faz |
+| Command | What it does |
 |---|---|
-| Não existe | Cria e baixa |
-| Existe sem marcador `.downloading` | Pula (considera concluída) |
-| Existe com marcador `.downloading` | Refaz (download anterior foi interrompido) |
+| `cnpj download [--start --end --workers --dry-run]` | Downloads every month missing under `--dir`. Safe to re-run: it only fetches what is missing and resumes partial files. |
+| `cnpj sqlite [YYYY-MM] [--only TABLE…] [--db PATH]` | One month into a SQLite file (default: last closed month). Reuses the download if it is already on disk. |
+| `cnpj postgres [YYYY-MM] [--schema --only --csv-dir --logged]` | One month into PostgreSQL through `COPY`, replacing the previous snapshot in a single transaction. |
+| `cnpj bulk-load [--only YYYY-MM… --reload --skip-indexes]` | Every downloaded month into the same tables, with a `competencia` column. Months already loaded are skipped; `--reload` replaces them. |
+| `cnpj validate CNPJ… [--format]` | Checks check digits, numeric or alphanumeric. Reads stdin with `-`. |
+| `cnpj lookup CNPJ --db PATH [--format]` | One establishment with its company, partners, Simples status and code descriptions. |
 
-Se um download é interrompido (Ctrl+C, queda de rede), o marcador
-`.downloading` fica na pasta — a próxima execução refaz aquele mês
-automaticamente.
+Output formats: `table` (default), `json`, `jsonl`, `csv`. Logs go to stderr and data to
+stdout, so `cnpj lookup … --format json | jq` works. Use `-v` for debug logs and `-q` for
+warnings only.
 
----
+**Exit codes:** `0` success · `1` failure (network, database, corrupt archive) or an invalid
+CNPJ in `validate` · `2` usage error · `3` CNPJ not found by `lookup` · `130` interrupted.
 
-### `bulk_load_postgres.py` — carregar tudo no Postgres
+**Configuration:** `--dir` / `CNPJ_DATA_DIR` (default `./data`), `--dsn` / `DATABASE_URL` /
+the libpq `PG*` variables, `--base-url` / `CNPJ_BASE_URL` for a mirror. See
+[`.env.example`](.env.example).
 
-Lê os `dados.tar.gz` baixados pelo `sync_months.py` e carrega num Postgres,
-**acumulando** os meses na mesma tabela (com uma coluna `competencia`).
-
-```bash
-# Carrega todos os meses encontrados em /dados/cnpj
-python bulk_load_postgres.py --output-dir /dados/cnpj
-
-# Só alguns meses
-python bulk_load_postgres.py --output-dir /dados/cnpj --only 2024-01 2024-02
-
-# Re-processar um mês (DELETE + reload)
-python bulk_load_postgres.py --output-dir /dados/cnpj --only 2024-01 --reload
-```
-
-**O que cria no banco:**
+### On-disk layout
 
 ```
-cnpj/                                ← schema
-├── empresas (competencia, ...)
-├── estabelecimentos (competencia, ...)
-├── socios (competencia, ...)
-├── simples (competencia, ...)
-├── cnaes, municipios, naturezas, ...  ← auxiliares, sem competencia
-└── competencias_carregadas             ← tabela de controle
+data/
+├── 2026-07/dados.tar.gz
+├── 2026-08/dados.tar.gz
+├── 2026-09/.downloading          ← unfinished: resumed on the next run
+│          dados.tar.gz.part
+└── cnpj_2026_08.db               ← from `cnpj sqlite`
 ```
 
-**Idempotência:** o script consulta `competencias_carregadas` antes de
-carregar cada mês. Se já estiver lá, pula. Use `--reload` para forçar.
+A month folder without `.downloading` counts as done.
 
-**Interrupção:** se você der Ctrl+C no meio, a competência em andamento
-é revertida (transação), mas as anteriores ficam preservadas. É seguro
-rodar de novo depois.
+### What lands in the database
 
----
-
-### `cnpj_pipeline.py` — pipeline completo num SQLite (1 mês)
-
-Tudo num único arquivo `.db`. Bom pra explorar localmente sem instalar
-banco nenhum.
-
-```bash
-# Último mês fechado
-python cnpj_pipeline.py --output-dir /dados/cnpj-sqlite
-
-# Mês específico
-python cnpj_pipeline.py 2026-04 --output-dir /dados/cnpj-sqlite
-
-# Só algumas tabelas (rápido)
-python cnpj_pipeline.py --only empresas estabelecimentos --output-dir /dados/cnpj-sqlite
-```
-
-Gera arquivo `cnpj_<comp>.db` na pasta base. Cada execução substitui
-o anterior (uma competência por vez, sem histórico).
-
----
-
-### `cnpj_to_postgres.py` — pipeline completo num Postgres (1 mês)
-
-Baixa + extrai + carrega no Postgres, **substituindo** os dados a cada
-rodada. Diferente do `bulk_load_postgres.py`, que acumula.
-
-```bash
-python cnpj_to_postgres.py 2026-04 --output-dir /dados/cnpj --schema cnpj_snapshot
-```
-
-Use isso se você só quer **o snapshot mais recente** no banco, sem
-histórico. Schema fica isolado para não conflitar com o `bulk_load_postgres.py`.
-
----
-
-## Configurando o Postgres
-
-Os scripts seguem o padrão libpq — qualquer destas formas funciona:
-
-**Via variáveis de ambiente:**
-```bash
-export PGHOST=localhost
-export PGPORT=5432
-export PGUSER=meuusuario
-export PGPASSWORD=minhasenha
-export PGDATABASE=meubanco
-```
-
-**Via DSN:**
-```bash
-python bulk_load_postgres.py --dsn 'postgresql://user:senha@host:5432/db'
-```
-
-**Via DATABASE_URL:**
-```bash
-export DATABASE_URL='postgresql://user:senha@host:5432/db'
-python bulk_load_postgres.py
-```
-
----
-
-## Exemplos de queries
-
-Depois do `bulk_load_postgres.py`, com histórico:
+`empresas`, `estabelecimentos`, `socios` and `simples`, plus the code tables `cnaes`,
+`municipios`, `naturezas`, `paises`, `qualificacoes` and `motivos`. Every column is `TEXT`
+on purpose: `cnpj_basico` keeps its leading zeros, `capital_social` uses a decimal comma and
+dates come as `YYYYMMDD`. Cast in queries or typed views. `bulk-load` adds `competencia` as
+the first column of the four main tables and records each month in
+`competencias_carregadas`.
 
 ```sql
--- Quantas empresas em cada competência
-SELECT competencia, COUNT(*) AS total
-FROM cnpj.empresas
-GROUP BY competencia
-ORDER BY competencia;
-
--- Evolução de uma empresa específica
-SELECT competencia, razao_social, capital_social, porte_empresa
-FROM cnpj.empresas
-WHERE cnpj_basico = '12345678'
-ORDER BY competencia;
-
--- Empresas NOVAS em 2026-04 (que não existiam em 2026-03)
+-- Companies that exist in 2026-08 but did not in 2026-07
 SELECT n.cnpj_basico, n.razao_social
 FROM cnpj.empresas n
-LEFT JOIN cnpj.empresas a
-  ON a.cnpj_basico = n.cnpj_basico AND a.competencia = '2026-03'
-WHERE n.competencia = '2026-04' AND a.cnpj_basico IS NULL;
-
--- Top 10 municípios em número de estabelecimentos ativos (última competência)
-SELECT m.descricao, COUNT(*) AS qtd
-FROM cnpj.estabelecimentos e
-JOIN cnpj.municipios m ON m.codigo = e.municipio
-WHERE e.competencia = (SELECT MAX(competencia) FROM cnpj.estabelecimentos)
-  AND e.situacao_cadastral = '02'  -- ativa
-GROUP BY m.descricao
-ORDER BY qtd DESC
-LIMIT 10;
+LEFT JOIN cnpj.empresas p
+  ON p.cnpj_basico = n.cnpj_basico AND p.competencia = '2026-07'
+WHERE n.competencia = '2026-08' AND p.cnpj_basico IS NULL;
 ```
 
----
+### Sizes and times (per month, rough)
 
-## Estrutura das tabelas
-
-Todas as colunas são carregadas como `TEXT` por design (campos como
-`cnpj_basico` têm zeros à esquerda, `capital_social` usa vírgula decimal,
-datas vêm como `YYYYMMDD`). Converta nas suas queries com `CAST`/`TO_DATE`
-ou crie views tipadas.
-
-**Encoding** dos CSVs originais: `latin1` — os scripts já tratam isso.
-
----
-
-## Tamanhos e tempos esperados
-
-| | Por competência | 36 competências (histórico completo) |
+| | One month | Full history (~40 months) |
 |---|---|---|
-| Download (tar.gz) | ~6 GB | ~210 GB |
-| Postgres (com índices) | ~40 GB | ~1.4 TB |
-| Tempo de download | 10-30 min | 6-18 h |
-| Tempo de carga | 30-90 min | 1-3 dias |
+| Download | ~6 GB | ~240 GB |
+| PostgreSQL with indexes | ~40 GB | ~1.5 TB |
+| Download time | 10–30 min | hours |
+| Load time | 30–90 min | days |
 
-Por isso o `sync_months.py` é idempotente e o `bulk_load_postgres.py` é
-retomável — rode em background, em pedaços, ou em um servidor que não
-desligue.
+`cnpj postgres` writes to the schema `cnpj_snapshot` by default and `cnpj bulk-load` to
+`cnpj`, so a snapshot never drops the history tables. A PostgreSQL snapshot load holds an exclusive lock on the tables it replaces until it
+commits. Point readers at another schema, or use `bulk-load`, if that matters.
 
----
+## Migrating from the old scripts
 
-## Limitações conhecidas
+| Old script | Now |
+|---|---|
+| `python sync_months.py --output-dir D` | `cnpj download --dir D` |
+| `python bulk_load_postgres.py --output-dir D` | `cnpj bulk-load --dir D` |
+| `python cnpj_pipeline.py 2026-04 --output-dir D` | `cnpj sqlite 2026-04 --dir D` |
+| `python cnpj_to_postgres.py 2026-04 --output-dir D --schema S` | `cnpj postgres 2026-04 --dir D --schema S` |
 
-- O **mês atual** muitas vezes ainda não está publicado no servidor. O
-  script trata o 404 como aviso e segue — você pode rodar de novo daqui
-  a alguns dias.
-- O layout dos CSVs da Receita pode mudar em competências futuras. Se
-  isso acontecer, rode com `-v` para ver detalhes; o loader trunca/padroniza
-  linhas com colunas a menos/mais.
-- O servidor da Receita cai eventualmente. Se isso acontecer durante o
-  download, basta rodar `sync_months.py` de novo — ele retoma do ponto
-  que parou.
+The month folders and the `competencias_carregadas` table are unchanged, so existing
+downloads and databases keep working. Archives that the old one-month scripts left in
+`D/downloads/cnpj_YYYY-MM.tar.gz` are checked for integrity and moved into `D/YYYY-MM/`
+instead of being downloaded again. `--output-dir` still works as an alias of `--dir`.
+`--download-dir`, `--work-dir`, `--no-prompt`, `--skip-download` and the interactive folder
+prompt are gone.
 
----
+## Tests
 
-## Estrutura do projeto
-
+```bash
+pip install -e ".[dev,postgres]"
+ruff check . && ruff format --check .
+pytest
 ```
-script-cnpj/
-├── sync_months.py          # baixa tudo (idempotente)
-├── bulk_load_postgres.py   # carrega tudo no Postgres (histórico)
-├── cnpj_pipeline.py        # pipeline 1-mês → SQLite
-├── cnpj_to_postgres.py     # pipeline 1-mês → Postgres (substitui)
-├── requirements.txt
-└── README.md
-```
+
+The suite never touches the internet. Downloads hit a local HTTP server that can be told to
+fail with 503/429, drop the connection halfway, ignore `Range`, answer at the wrong offset
+or serve an HTML page. The data is a synthetic dump with the real file layout
+([`tests/fakedump.py`](tests/fakedump.py)). PostgreSQL tests run against a real server when
+`CNPJ_TEST_DSN` points at a disposable database. CI starts one, and
+[CONTRIBUTING.md](CONTRIBUTING.md) shows a one-line Docker setup.
+
+`python scripts/demo.py` runs the whole flow offline. `python scripts/build_diagram.py`
+regenerates the diagrams above.
+
+## Data source, terms and privacy
+
+- The data is published by **Receita Federal do Brasil** as open data
+  ([dados.gov.br](https://dados.gov.br/dados/conjuntos-dados/cadastro-nacional-da-pessoa-juridica---cnpj)).
+  Credit the source when you use it. This project is not affiliated with the Brazilian
+  government.
+- Be gentle with the public server: keep `--workers` low and don't script tight loops
+  around `cnpj download`.
+- `socios` holds names of real people. The source already masks their CPF numbers. A
+  database built from it is personal data under Brazil's LGPD: keep it private and use it
+  only for a legitimate purpose.
+
+## License
+
+[MIT](LICENSE) © 2026 Fabiano Arthur

@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 572" width="880" height="572" role="img" aria-labelledby="title desc" lang="en">
+<title id="title">How cnpj-etl works</title>
+<desc id="desc">cnpj download fetches each monthly snapshot from the Receita Federal open data share, with retries, backoff, resumable ranges and at most four parallel downloads, into one folder per month. The archive is extracted safely: tar.gz or zip, inner zips, latin-1 CSV files. cnpj sqlite loads one month into a SQLite file that cnpj lookup queries, printing JSON, CSV or a table. cnpj postgres replaces a PostgreSQL snapshot in one transaction, and cnpj bulk-load appends every month with a competencia column, one transaction per month.</desc>
+<style>
+text{font-family:ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;fill:#1f2328}
+.b{font-size:14px;font-weight:600}
+.h{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.m{font-size:12.5px;fill:#59636e}
+.code{font-family:ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;font-size:13.5px;font-weight:600;fill:#0550ae}
+.bg{fill:#f6f8fa;stroke:#d0d7de}
+.card{fill:#ffffff;stroke:#d0d7de}
+.src{fill:#eef0fe;stroke:#c3c8fa}
+.srct{fill:#3b45b5}
+.disk{fill:#eef1f4;stroke:#d0d7de;stroke-dasharray:5 4}
+.e{fill:none;stroke:#818b98;stroke-width:1.5;stroke-linejoin:round}
+.dot{fill:#c2410c}
+.halo{fill:#c2410c;opacity:.25}
+.hl{fill:none;stroke:#c2410c;stroke-width:2;stroke-linejoin:round}
+@media (prefers-reduced-motion:reduce){.pk,.hl{display:none}}
+</style>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#818b98"/></marker></defs>
+<rect x="0.5" y="0.5" width="879" height="571" rx="16" class="bg"/>
+<rect x="24" y="46" width="220" height="92" rx="10" class="src"/>
+<text x="134.0" y="77.0" class="b srct" text-anchor="middle">Receita Federal</text>
+<text x="134.0" y="97.0" class="m" text-anchor="middle">open data share</text>
+<text x="134.0" y="117.0" class="m" text-anchor="middle">one archive per month</text>
+<text x="277" y="84" class="m" text-anchor="middle">HTTPS</text>
+<rect x="310" y="46" width="240" height="92" rx="10" class="card"/>
+<text x="430.0" y="77.0" class="code" text-anchor="middle">cnpj download</text>
+<text x="430.0" y="97.0" class="m" text-anchor="middle">retry · backoff · resume</text>
+<text x="430.0" y="117.0" class="m" text-anchor="middle">≤ 4 in parallel</text>
+<rect x="616" y="46" width="240" height="92" rx="10" class="disk"/>
+<text x="736.0" y="77.0" class="code" text-anchor="middle">data/YYYY-MM/</text>
+<text x="736.0" y="97.0" class="m" text-anchor="middle">dados.tar.gz</text>
+<text x="736.0" y="117.0" class="m" text-anchor="middle">atomic rename, resumable</text>
+<rect x="300" y="202" width="280" height="80" rx="10" class="card"/>
+<text x="440.0" y="227.0" class="b" text-anchor="middle">safe extraction</text>
+<text x="440.0" y="247.0" class="m" text-anchor="middle">tar.gz or zip → inner zips</text>
+<text x="440.0" y="267.0" class="m" text-anchor="middle">→ latin-1 CSV, no traversal</text>
+<rect x="24" y="346" width="250" height="90" rx="10" class="card"/>
+<text x="149.0" y="376.0" class="code" text-anchor="middle">cnpj sqlite</text>
+<text x="149.0" y="396.0" class="m" text-anchor="middle">one month</text>
+<text x="149.0" y="416.0" class="m" text-anchor="middle">→ cnpj_YYYY_MM.db</text>
+<rect x="315" y="346" width="250" height="90" rx="10" class="card"/>
+<text x="440.0" y="376.0" class="code" text-anchor="middle">cnpj postgres</text>
+<text x="440.0" y="396.0" class="m" text-anchor="middle">one month, replaces</text>
+<text x="440.0" y="416.0" class="m" text-anchor="middle">the snapshot atomically</text>
+<rect x="606" y="346" width="250" height="90" rx="10" class="card"/>
+<text x="731.0" y="376.0" class="code" text-anchor="middle">cnpj bulk-load</text>
+<text x="731.0" y="396.0" class="m" text-anchor="middle">every month, with history</text>
+<text x="731.0" y="416.0" class="m" text-anchor="middle">one transaction per month</text>
+<rect x="24" y="470" width="250" height="62" rx="10" class="card"/>
+<text x="149.0" y="496.0" class="code" text-anchor="middle">cnpj lookup</text>
+<text x="149.0" y="516.0" class="m" text-anchor="middle">JSON · CSV · table</text>
+<rect x="315" y="470" width="541" height="62" rx="10" class="card"/>
+<text x="585.5" y="496.0" class="b" text-anchor="middle">PostgreSQL</text>
+<text x="585.5" y="516.0" class="m" text-anchor="middle">schema cnpj · COPY FROM STDIN · indexes · ANALYZE</text>
+<path d="M244,92 H310" class="e" marker-end="url(#ah)"/>
+<path d="M550,92 H616" class="e" marker-end="url(#ah)"/>
+<path d="M736,138 V170 H440 V202" class="e" marker-end="url(#ah)"/>
+<path d="M400,282 V312 H149 V346" class="e" marker-end="url(#ah)"/>
+<path d="M440,282 V346" class="e" marker-end="url(#ah)"/>
+<path d="M480,282 V312 H731 V346" class="e" marker-end="url(#ah)"/>
+<path d="M149,436 V470" class="e" marker-end="url(#ah)"/>
+<path d="M440,436 V470" class="e" marker-end="url(#ah)"/>
+<path d="M731,436 V470" class="e" marker-end="url(#ah)"/>
+<path d="M244,92 H310" class="hl" opacity="0"><animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;.9;.9;0;0" keyTimes="0;0.0000;0.0200;0.1200;0.1900;1"/></path><g class="pk" opacity="0"><circle r="9" class="halo"/><circle r="4.5" class="dot"/><animateMotion dur="9.0s" repeatCount="indefinite" path="M244,92 H310" keyPoints="0;0;1;1" keyTimes="0;0.0200;0.1200;1" calcMode="spline" keySplines="0 0 1 1;.45 0 .55 1;0 0 1 1"/><animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.0050;0.0200;0.1200;0.1400;1"/></g>
+<path d="M550,92 H616" class="hl" opacity="0"><animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;.9;.9;0;0" keyTimes="0;0.1200;0.1400;0.2400;0.3100;1"/></path><g class="pk" opacity="0"><circle r="9" class="halo"/><circle r="4.5" class="dot"/><animateMotion dur="9.0s" repeatCount="indefinite" path="M550,92 H616" keyPoints="0;0;1;1" keyTimes="0;0.1400;0.2400;1" calcMode="spline" keySplines="0 0 1 1;.45 0 .55 1;0 0 1 1"/><animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.1250;0.1400;0.2400;0.2600;1"/></g>
+<path d="M736,138 V170 H440 V202" class="hl" opacity="0"><animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;.9;.9;0;0" keyTimes="0;0.2400;0.2600;0.4000;0.4700;1"/></path><g class="pk" opacity="0"><circle r="9" class="halo"/><circle r="4.5" class="dot"/><animateMotion dur="9.0s" repeatCount="indefinite" path="M736,138 V170 H440 V202" keyPoints="0;0;1;1" keyTimes="0;0.2600;0.4000;1" calcMode="spline" keySplines="0 0 1 1;.45 0 .55 1;0 0 1 1"/><animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.2450;0.2600;0.4000;0.4200;1"/></g>
+<path d="M400,282 V312 H149 V346" class="hl" opacity="0"><animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;.9;.9;0;0" keyTimes="0;0.4000;0.4200;0.5600;0.6300;1"/></path><g class="pk" opacity="0"><circle r="9" class="halo"/><circle r="4.5" class="dot"/><animateMotion dur="9.0s" repeatCount="indefinite" path="M400,282 V312 H149 V346" keyPoints="0;0;1;1" keyTimes="0;0.4200;0.5600;1" calcMode="spline" keySplines="0 0 1 1;.45 0 .55 1;0 0 1 1"/><animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.4050;0.4200;0.5600;0.5800;1"/></g>
+<path d="M440,282 V346" class="hl" opacity="0"><animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;.9;.9;0;0" keyTimes="0;0.4000;0.4200;0.5600;0.6300;1"/></path><g class="pk" opacity="0"><circle r="9" class="halo"/><circle r="4.5" class="dot"/><animateMotion dur="9.0s" repeatCount="indefinite" path="M440,282 V346" keyPoints="0;0;1;1" keyTimes="0;0.4200;0.5600;1" calcMode="spline" keySplines="0 0 1 1;.45 0 .55 1;0 0 1 1"/><animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.4050;0.4200;0.5600;0.5800;1"/></g>
+<path d="M480,282 V312 H731 V346" class="hl" opacity="0"><animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;.9;.9;0;0" keyTimes="0;0.4000;0.4200;0.5600;0.6300;1"/></path><g class="pk" opacity="0"><circle r="9" class="halo"/><circle r="4.5" class="dot"/><animateMotion dur="9.0s" repeatCount="indefinite" path="M480,282 V312 H731 V346" keyPoints="0;0;1;1" keyTimes="0;0.4200;0.5600;1" calcMode="spline" keySplines="0 0 1 1;.45 0 .55 1;0 0 1 1"/><animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.4050;0.4200;0.5600;0.5800;1"/></g>
+<path d="M149,436 V470" class="hl" opacity="0"><animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;.9;.9;0;0" keyTimes="0;0.5800;0.6000;0.7000;0.7700;1"/></path><g class="pk" opacity="0"><circle r="9" class="halo"/><circle r="4.5" class="dot"/><animateMotion dur="9.0s" repeatCount="indefinite" path="M149,436 V470" keyPoints="0;0;1;1" keyTimes="0;0.6000;0.7000;1" calcMode="spline" keySplines="0 0 1 1;.45 0 .55 1;0 0 1 1"/><animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.5850;0.6000;0.7000;0.7200;1"/></g>
+<path d="M440,436 V470" class="hl" opacity="0"><animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;.9;.9;0;0" keyTimes="0;0.5800;0.6000;0.7000;0.7700;1"/></path><g class="pk" opacity="0"><circle r="9" class="halo"/><circle r="4.5" class="dot"/><animateMotion dur="9.0s" repeatCount="indefinite" path="M440,436 V470" keyPoints="0;0;1;1" keyTimes="0;0.6000;0.7000;1" calcMode="spline" keySplines="0 0 1 1;.45 0 .55 1;0 0 1 1"/><animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.5850;0.6000;0.7000;0.7200;1"/></g>
+<path d="M731,436 V470" class="hl" opacity="0"><animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;.9;.9;0;0" keyTimes="0;0.5800;0.6000;0.7000;0.7700;1"/></path><g class="pk" opacity="0"><circle r="9" class="halo"/><circle r="4.5" class="dot"/><animateMotion dur="9.0s" repeatCount="indefinite" path="M731,436 V470" keyPoints="0;0;1;1" keyTimes="0;0.6000;0.7000;1" calcMode="spline" keySplines="0 0 1 1;.45 0 .55 1;0 0 1 1"/><animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.5850;0.6000;0.7000;0.7200;1"/></g>
+</svg>

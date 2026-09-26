@@ -1,11 +1,17 @@
-# Saídas do pipeline
-downloads/
-cnpj_*/
+# Data produced by the CLI (default --dir is ./data)
+/data/
+/downloads/
+/[0-9][0-9][0-9][0-9]-[0-9][0-9]/
+.work-*/
 *.db
+*.db-journal
 *.db-wal
 *.db-shm
+*.db.tmp-*
 *.tar.gz
 *.zip
+*.part
+*.part.json
 
 # Python
 __pycache__/
@@ -13,9 +19,20 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
-env/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
-# IDE / SO
+# Local config
+.env
+
+# Editors / OS
 .vscode/
 .idea/
 .DS_Store
+
+# Agent workspace
+.orq/
