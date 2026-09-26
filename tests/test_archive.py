@@ -92,3 +92,16 @@ def test_truncated_tar_raises_archive_error(tmp_path):
     src.write_bytes(build_tar_gz(padding=50_000)[:-2000])
     with pytest.raises(archive.ArchiveError, match="corrupt or truncated"):
         archive.extract(src, tmp_path / "out")
+
+
+def test_corrupt_inner_zip_raises_archive_error(tmp_path):
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        data = b"PK\x03\x04 this is not really a zip"
+        info = tarfile.TarInfo("Empresas0.zip")
+        info.size = len(data)
+        tar.addfile(info, io.BytesIO(data))
+    src = tmp_path / "dados.tar.gz"
+    src.write_bytes(buf.getvalue())
+    with pytest.raises(archive.ArchiveError, match=r"Empresas0\.zip"):
+        archive.extract(src, tmp_path / "out")

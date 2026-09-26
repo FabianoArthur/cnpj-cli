@@ -107,7 +107,7 @@ def test_bulk_load_is_idempotent_and_reloadable(conn, schema, tmp_path):
     assert report == {"processed": ["2026-03", "2026-04"], "skipped": []}
     assert count(conn, schema, "empresas") == 6
     assert count(conn, schema, "empresas", "WHERE competencia = '2026-04'") == 3
-    assert count(conn, schema, "cnaes") == 2, "lookup tables are loaded once"
+    assert count(conn, schema, "cnaes") == 3, "lookup tables are loaded once"
     assert not list(tmp_path.glob(".work-*")), "extraction folders are cleaned up"
 
     again = postgres_load.bulk_load(conn, tmp_path, months, schema)

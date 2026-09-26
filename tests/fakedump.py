@@ -147,6 +147,7 @@ SOCIOS = [
 ]
 SIMPLES = [["11222333", "S", "20150302", "", "N", "", ""]]
 CNAES = [
+    ["4721102", "Padaria e confeitaria com predominância de revenda"],
     ["1091102", "Fabricação de produtos de padaria e confeitaria"],
     ["5611203", "Lanchonetes e similares"],
 ]

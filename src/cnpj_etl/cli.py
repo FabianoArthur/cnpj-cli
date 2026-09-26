@@ -215,7 +215,11 @@ def cmd_lookup(args: argparse.Namespace) -> int:
     if not db.exists():
         log.error("database not found: %s (build it with `cnpj sqlite`)", db)
         return EXIT_FAIL
-    record = lookup.lookup(db, args.cnpj)
+    try:
+        record = lookup.lookup(db, args.cnpj)
+    except lookup.LookupUnavailable as exc:
+        log.error("%s", exc)
+        return EXIT_FAIL
     if record is None:
         log.error("%s not found in %s", cnpj.format_cnpj(cnpj.normalize(args.cnpj)), db.name)
         return EXIT_NOT_FOUND
@@ -262,7 +266,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     pg = argparse.ArgumentParser(add_help=False)
     pg.add_argument("--dsn", help="postgresql://... (default: $DATABASE_URL, then PG* variables)")
-    pg.add_argument("--schema", default="cnpj", help="target schema (default: cnpj)")
 
     from cnpj_etl import layout
 
@@ -321,6 +324,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--only", nargs="+", choices=tables, metavar="TABLE", help="load only these tables"
     )
+    p.add_argument(
+        "--schema",
+        default="cnpj_snapshot",
+        help="target schema (default: cnpj_snapshot, apart from bulk-load's history)",
+    )
     p.add_argument("--csv-dir", help="skip download and extraction, load CSVs from here")
     p.add_argument(
         "--logged",
@@ -338,6 +346,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--only", nargs="+", type=_month, metavar="YYYY-MM", help="load only these months"
     )
+    p.add_argument("--schema", default="cnpj", help="target schema (default: cnpj)")
     p.add_argument("--reload", action="store_true", help="replace months already loaded")
     p.add_argument("--skip-indexes", action="store_true", help="do not create indexes at the end")
     p.set_defaults(func=cmd_bulk_load)

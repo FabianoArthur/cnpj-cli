@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from cnpj_etl import cnpj
 
@@ -17,6 +18,10 @@ PORTE = {
     "05": "demais",
 }
 TIPO_SOCIO = {"1": "pessoa jurídica", "2": "pessoa física", "3": "estrangeiro"}
+
+
+class LookupUnavailable(RuntimeError):
+    """The database lacks the tables a lookup needs (built with ``--only``?)."""
 
 
 def _date(value: str | None) -> str | None:
@@ -75,9 +80,15 @@ def lookup(db_path: Path, value: str) -> dict[str, Any] | None:
         raise FileNotFoundError(db_path)
     basico, ordem, dv = cnpj.split(value)
 
-    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    uri = f"file:{quote(str(db_path.resolve()))}?mode=ro"
+    conn = sqlite3.connect(uri, uri=True)
     conn.row_factory = sqlite3.Row
     try:
+        if not _has_table(conn, "estabelecimentos"):
+            raise LookupUnavailable(
+                f"{db_path.name} has no estabelecimentos table; rebuild it with `cnpj sqlite` "
+                "including that table"
+            )
         est = conn.execute(
             "SELECT * FROM estabelecimentos WHERE cnpj_basico = ? AND cnpj_ordem = ? "
             "AND cnpj_dv = ?",

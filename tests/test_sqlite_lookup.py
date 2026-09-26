@@ -35,7 +35,7 @@ def test_load_counts_rows_and_pads_short_rows(tmp_path, csv_dir):
         "estabelecimentos": 3,
         "socios": 2,
         "simples": 1,
-        "cnaes": 2,
+        "cnaes": 3,
         "municipios": 2,
         "naturezas": 2,
         "paises": 1,
@@ -91,7 +91,10 @@ def test_lookup_joins_descriptions(db):
     assert result["situacao_cadastral"] == "ativa"
     assert result["natureza_juridica"] == "2062 - Sociedade Empresária Limitada"
     assert result["cnae_principal"] == "1091102 - Fabricação de produtos de padaria e confeitaria"
-    assert result["cnaes_secundarios"] == ["4721102", "5611203 - Lanchonetes e similares"]
+    assert result["cnaes_secundarios"] == [
+        "4721102 - Padaria e confeitaria com predominância de revenda",
+        "5611203 - Lanchonetes e similares",
+    ]
     assert result["municipio"] == "SAO PAULO"
     assert result["uf"] == "SP"
     assert result["capital_social"] == 50000.0
@@ -147,3 +150,18 @@ def test_output_table_aligns_columns():
     lines = buf.getvalue().splitlines()
     assert lines[0].split() == ["CNPJ", "VALID", "TAGS"]
     assert lines[1].startswith("11.222.333/0001-81  yes")
+
+
+def test_lookup_on_partial_database_is_a_clear_error(tmp_path, csv_dir):
+    path = tmp_path / "partial.db"
+    sqlite_load.load(csv_dir, path, only=["empresas"])
+    with pytest.raises(lookup.LookupUnavailable, match="estabelecimentos"):
+        lookup.lookup(path, "11222333000181")
+
+
+def test_lookup_path_with_special_characters(tmp_path, csv_dir):
+    folder = tmp_path / "odd?dir#1"
+    folder.mkdir()
+    path = folder / "cnpj.db"
+    sqlite_load.load(csv_dir, path)
+    assert lookup.lookup(path, "11222333000181")["uf"] == "SP"

@@ -79,8 +79,11 @@ def extract(path: Path, dest: Path) -> None:
         log.info("unpacking %d inner zip(s)", len(inner))
     for zip_path in inner:
         log.debug("unpacking %s", zip_path.name)
-        with zipfile.ZipFile(zip_path) as z:
-            z.extractall(zip_path.parent)  # noqa: S202 - same sanitising as above
+        try:
+            with zipfile.ZipFile(zip_path) as z:
+                z.extractall(zip_path.parent)  # noqa: S202 - same sanitising as above
+        except (zipfile.BadZipFile, EOFError, OSError) as exc:
+            raise ArchiveError(f"inner file {zip_path.name} is corrupt: {exc}") from exc
         zip_path.unlink()
 
 

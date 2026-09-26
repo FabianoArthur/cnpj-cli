@@ -120,7 +120,8 @@ def _content_range(value: str | None) -> tuple[int | None, int | None]:
     if not value or not value.startswith("bytes "):
         return None, None
     span, _, total = value[6:].partition("/")
-    start = None if span == "*" else int(span.split("-")[0])
+    first = span.split("-")[0]
+    start = int(first) if first.isdigit() else None
     return start, (int(total) if total.isdigit() else None)
 
 

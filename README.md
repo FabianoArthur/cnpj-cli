@@ -136,7 +136,8 @@ WHERE n.competencia = '2026-08' AND p.cnpj_basico IS NULL;
 | Download time | 10–30 min | hours |
 | Load time | 30–90 min | days |
 
-A PostgreSQL snapshot load holds an exclusive lock on the tables it replaces until it
+`cnpj postgres` writes to the schema `cnpj_snapshot` by default and `cnpj bulk-load` to
+`cnpj`, so a snapshot never drops the history tables. A PostgreSQL snapshot load holds an exclusive lock on the tables it replaces until it
 commits. Point readers at another schema, or use `bulk-load`, if that matters.
 
 ## Migrating from the old scripts

@@ -138,7 +138,8 @@ WHERE n.competencia = '2026-08' AND p.cnpj_basico IS NULL;
 | Tempo de download | 10–30 min | horas |
 | Tempo de carga | 30–90 min | dias |
 
-A carga de snapshot no PostgreSQL segura um lock exclusivo nas tabelas que está trocando
+Por padrão o `cnpj postgres` grava no schema `cnpj_snapshot` e o `cnpj bulk-load` em
+`cnpj`, então um snapshot nunca apaga as tabelas de histórico. A carga de snapshot no PostgreSQL segura um lock exclusivo nas tabelas que está trocando
 até o commit. Se isso importar, aponte as leituras para outro schema ou use o `bulk-load`.
 
 ## Migrando dos scripts antigos

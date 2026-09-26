@@ -222,3 +222,10 @@ def test_adopt_legacy_refuses_truncated(tmp_path):
     legacy.write_bytes(DATA[:-5000])
     assert download.adopt_legacy(tmp_path, "2024-01", min_size=0) is None
     assert legacy.exists()
+
+
+def test_content_range_parsing_tolerates_garbage():
+    assert download._content_range("bytes 10-19/20") == (10, 20)
+    assert download._content_range("bytes */20") == (None, 20)
+    assert download._content_range("bytes abc-def/xyz") == (None, None)
+    assert download._content_range(None) == (None, None)

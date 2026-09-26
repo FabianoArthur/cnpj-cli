@@ -196,3 +196,9 @@ def test_invalid_schema_is_usage_error(capsys, tmp_path):
     code, _, err = run(capsys, "bulk-load", "--dir", str(tmp_path), "--schema", "Bad-Name")
     assert code == 2
     assert "invalid schema" in err
+
+
+def test_postgres_snapshot_has_its_own_default_schema():
+    args = cli.build_parser().parse_args(["postgres"])
+    assert args.schema == "cnpj_snapshot"
+    assert cli.build_parser().parse_args(["bulk-load"]).schema == "cnpj"
