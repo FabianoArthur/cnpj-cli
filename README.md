@@ -6,7 +6,7 @@ SQLite or PostgreSQL. It retries, resumes and keeps month-by-month history.
 
 [Português (Brasil)](README.pt-BR.md)
 
-[![CI](https://github.com/FabianoArthur/script-cnpj/actions/workflows/ci.yml/badge.svg)](https://github.com/FabianoArthur/script-cnpj/actions/workflows/ci.yml)
+[![CI](https://github.com/FabianoArthur/cnpj-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/FabianoArthur/cnpj-cli/actions/workflows/ci.yml)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
@@ -47,8 +47,8 @@ sometimes a zip under the same name. `cnpj` deals with all of that:
 Python 3.10 or newer.
 
 ```bash
-git clone https://github.com/FabianoArthur/script-cnpj.git
-cd script-cnpj
+git clone https://github.com/FabianoArthur/cnpj-cli.git
+cd cnpj-cli
 python -m venv .venv && source .venv/bin/activate
 pip install ".[postgres]"      # drop [postgres] if you only need SQLite
 cnpj --help
