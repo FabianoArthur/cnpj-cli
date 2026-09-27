@@ -7,7 +7,7 @@ guarda o histórico mês a mês.
 
 [English](README.md)
 
-[![CI](https://github.com/FabianoArthur/script-cnpj/actions/workflows/ci.yml/badge.svg)](https://github.com/FabianoArthur/script-cnpj/actions/workflows/ci.yml)
+[![CI](https://github.com/FabianoArthur/cnpj-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/FabianoArthur/cnpj-cli/actions/workflows/ci.yml)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 ![Licença: MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-green)
 
@@ -48,8 +48,8 @@ vezes é tar.gz, às vezes é zip com o mesmo nome. O `cnpj` resolve tudo isso:
 Python 3.10 ou mais novo.
 
 ```bash
-git clone https://github.com/FabianoArthur/script-cnpj.git
-cd script-cnpj
+git clone https://github.com/FabianoArthur/cnpj-cli.git
+cd cnpj-cli
 python -m venv .venv && source .venv/bin/activate
 pip install ".[postgres]"      # tire o [postgres] se só precisar de SQLite
 cnpj --help
